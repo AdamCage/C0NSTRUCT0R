@@ -8,18 +8,18 @@ services:
       - "8080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # - frontend_dist:/usr/share/nginx/html:ro  # ← монтируем сборку фронтенда
+      - frontend_dist:/usr/share/nginx/html:ro  # ← монтируем сборку фронтенда
     depends_on:
       - backend
       - ml-service
 
-  # frontend-build:
-  #   build:
-  #     context: ./frontend
-  #     target: build
-  #   volumes:
-  #     - frontend_dist:/app/dist
-  #   command: sh -c "echo 'Build complete, dist saved to volume'"
+  frontend-build:
+    build:
+      context: ./frontend
+      target: build
+    volumes:
+      - frontend_dist:/out
+    command: sh -c "cp -r /app/dist/* /out/ || true && ls -la /out && echo 'Build copied to volume'"
 
   backend:
     build: ./backend
@@ -84,3 +84,4 @@ services:
 
 volumes:
   ollama: {}
+  frontend_dist: {}

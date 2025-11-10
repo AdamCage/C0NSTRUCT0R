@@ -1,0 +1,585 @@
+import { Box, VStack, Text, Button, HStack, Input, SimpleGrid } from '@chakra-ui/react';
+import { useDraggable } from '@dnd-kit/core';
+import { useState, useEffect } from 'react';
+import { useProjectStore } from '../store/useProjectStore';
+import { useTemplatesStore } from '../store/useTemplatesStore';
+import { useFunctionsStore } from '../store/useFunctionsStore';
+import { TemplateCard } from './TemplateCard';
+import type { BlockType, TriggerType } from '../types';
+
+const blockTypes: { type: BlockType; label: string; icon: string }[] = [
+  { type: 'text', label: 'Текст', icon: '📝' },
+  { type: 'image', label: 'Изображение', icon: '🖼️' },
+  { type: 'button', label: 'Кнопка', icon: '🔘' },
+  { type: 'video', label: 'Видео', icon: '🎥' },
+  { type: 'container', label: 'Контейнер', icon: '📦' },
+  { type: 'grid', label: 'Сетка', icon: '🔳' },
+];
+
+interface DraggableBlockButtonProps {
+  type: BlockType;
+  label: string;
+  icon: string;
+}
+
+const DraggableBlockButton = ({ type, label, icon }: DraggableBlockButtonProps) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `new-block-${type}`,
+    data: { type },
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        opacity: isDragging ? 0.5 : 1,
+      }
+    : undefined;
+
+  return (
+    <Button
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      backgroundColor="white"
+      color="black"
+      border="1px solid #e0e0e0"
+      justifyContent="flex-start"
+      cursor="grab"
+      _hover={{
+        backgroundColor: '#f0f0f0',
+        borderColor: '#007bff',
+      }}
+      _active={{
+        cursor: 'grabbing',
+      }}
+    >
+      <HStack gap="8px" align="center">
+        <Box as="span">{icon}</Box>
+        <Text>{label}</Text>
+      </HStack>
+    </Button>
+  );
+};
+
+const triggerLabels: Record<TriggerType, string> = {
+  onClick: 'При клике',
+  onHover: 'При наведении',
+  onLoad: 'При загрузке',
+  onScroll: 'При скролле',
+  onFocus: 'При фокусе',
+  onBlur: 'При потере фокуса',
+  onChange: 'При изменении',
+  onSubmit: 'При отправке формы',
+};
+
+export const BlocksPanel = () => {
+  const { project, updateTheme } = useProjectStore();
+  const { templates, loadFromLocalStorage, addTemplate } = useTemplatesStore();
+  const {
+    functions,
+    selectedFunctionId,
+    addFunction,
+    updateFunction,
+    deleteFunction,
+    duplicateFunction,
+    selectFunction,
+    loadFromLocalStorage: loadFunctions,
+  } = useFunctionsStore();
+  const [isOpen, setIsOpen] = useState(false);
+  const onOpen = () => setIsOpen(true);
+  const onClose = () => setIsOpen(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [selectedBlocks, setSelectedBlocks] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'blocks' | 'templates' | 'theme' | 'logic'>('blocks');
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [tempName, setTempName] = useState('');
+
+  useEffect(() => {
+    loadFromLocalStorage();
+    loadFunctions();
+  }, [loadFromLocalStorage, loadFunctions]);
+
+  const handleSaveAsTemplate = () => {
+    if (!templateName.trim() || selectedBlocks.length === 0) {
+      alert('Введите название и выберите блоки');
+      return;
+    }
+
+    const blocksToSave = project.blocks.filter((block) => selectedBlocks.includes(block.id));
+    
+    addTemplate({
+      name: templateName,
+      description: templateDescription,
+      category: 'Пользовательские',
+      blocks: blocksToSave,
+    });
+
+    setTemplateName('');
+    setTemplateDescription('');
+    setSelectedBlocks([]);
+    onClose();
+  };
+
+  return (
+    <Box
+      width="300px"
+      height="100vh"
+      backgroundColor="#f5f5f5"
+      borderRight="1px solid #e0e0e0"
+      display="flex"
+      flexDirection="column"
+    >
+      {/* Вкладки */}
+      <HStack gap={0} borderBottom="1px solid #e0e0e0">
+        <Button
+          variant={activeTab === 'blocks' ? 'solid' : 'ghost'}
+          borderRadius="0"
+          onClick={() => setActiveTab('blocks')}
+          flex="1"
+          fontSize="12px"
+        >
+          Блоки
+        </Button>
+        <Button
+          variant={activeTab === 'templates' ? 'solid' : 'ghost'}
+          borderRadius="0"
+          onClick={() => setActiveTab('templates')}
+          flex="1"
+          fontSize="12px"
+        >
+          Готовые
+        </Button>
+        <Button
+          variant={activeTab === 'theme' ? 'solid' : 'ghost'}
+          borderRadius="0"
+          onClick={() => setActiveTab('theme')}
+          flex="1"
+          fontSize="12px"
+        >
+          Тема
+        </Button>
+        <Button
+          variant={activeTab === 'logic' ? 'solid' : 'ghost'}
+          borderRadius="0"
+          onClick={() => setActiveTab('logic')}
+          flex="1"
+          fontSize="12px"
+        >
+          Логика
+        </Button>
+      </HStack>
+
+      <Box flex="1" overflowY="auto" padding="20px">
+        {activeTab === 'blocks' && (
+          <>
+            <Text fontSize="18px" fontWeight="bold" marginBottom="20px">
+              Базовые блоки
+            </Text>
+              <VStack gap="10px" align="stretch">
+                {blockTypes.map(({ type, label, icon }) => (
+                  <DraggableBlockButton key={type} type={type} label={label} icon={icon} />
+                ))}
+              </VStack>
+          </>
+        )}
+
+        {activeTab === 'templates' && (
+          <>
+            <HStack justify="space-between" marginBottom="20px">
+              <Text fontSize="18px" fontWeight="bold">
+                Готовые блоки
+              </Text>
+              <Button size="sm" onClick={onOpen}>
+                + Сохранить
+              </Button>
+            </HStack>
+
+            {templates.length === 0 ? (
+              <Text fontSize="14px" color="#666" textAlign="center" padding="20px">
+                Нет готовых блоков
+              </Text>
+            ) : (
+              <SimpleGrid columns={1} gap="12px">
+                {templates.map((template) => (
+                  <TemplateCard key={template.id} template={template} showDeleteButton={true} />
+                ))}
+              </SimpleGrid>
+            )}
+          </>
+        )}
+
+        {activeTab === 'theme' && (
+          <VStack gap="16px" align="stretch">
+            <Text fontSize="18px" fontWeight="bold">Тема проекта</Text>
+            <HStack gap="12px">
+              <label>
+                <input
+                  type="radio"
+                  name="theme-mode"
+                  checked={project.theme.mode === 'light'}
+                  onChange={() => updateTheme({ mode: 'light' })}
+                />{' '}
+                Светлая
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="theme-mode"
+                  checked={project.theme.mode === 'dark'}
+                  onChange={() => updateTheme({ mode: 'dark' })}
+                />{' '}
+                Тёмная
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={project.theme.mode === 'dark'}
+                  onChange={(e) => updateTheme({ mode: e.target.checked ? 'dark' : 'light' })}
+                />{' '}
+                Темный режим
+              </label>
+            </HStack>
+            <VStack gap="10px" align="stretch">
+              <HStack justify="space-between">
+                <Text>Акцент</Text>
+                <Input type="color" value={project.theme.accent} onChange={(e) => updateTheme({ accent: e.target.value })} width="60px" padding={0} />
+              </HStack>
+              <HStack justify="space-between">
+                <Text>Текст</Text>
+                <Input type="color" value={project.theme.text} onChange={(e) => updateTheme({ text: e.target.value })} width="60px" padding={0} />
+              </HStack>
+              <HStack justify="space-between">
+                <Text>Заголовки</Text>
+                <Input type="color" value={project.theme.heading} onChange={(e) => updateTheme({ heading: e.target.value })} width="60px" padding={0} />
+              </HStack>
+              <HStack justify="space-between">
+                <Text>Фон страницы</Text>
+                <Input type="color" value={project.theme.background} onChange={(e) => updateTheme({ background: e.target.value })} width="60px" padding={0} />
+              </HStack>
+              <HStack justify="space-between">
+                <Text>Поверхность панелей</Text>
+                <Input type="color" value={project.theme.surface} onChange={(e) => updateTheme({ surface: e.target.value })} width="60px" padding={0} />
+              </HStack>
+              <HStack justify="space-between">
+                <Text>Цвет границ</Text>
+                <Input type="color" value={project.theme.border} onChange={(e) => updateTheme({ border: e.target.value })} width="60px" padding={0} />
+              </HStack>
+            </VStack>
+          </VStack>
+        )}
+
+        {activeTab === 'logic' && (
+          <VStack gap="12px" align="stretch">
+            <HStack justify="space-between" marginBottom="8px">
+              <Text fontSize="18px" fontWeight="bold">
+                Функции
+              </Text>
+              <Button size="sm" colorScheme="blue" onClick={addFunction}>
+                + Создать
+              </Button>
+            </HStack>
+
+            {functions.length === 0 ? (
+              <Text fontSize="14px" color="#666" textAlign="center" padding="20px">
+                Нет функций. Создайте первую функцию.
+              </Text>
+            ) : (
+              <VStack gap="8px" align="stretch">
+                {functions.map((fn) => (
+                  <Box
+                    key={fn.id}
+                    backgroundColor={selectedFunctionId === fn.id ? '#e3f2fd' : 'white'}
+                    border="1px solid #e0e0e0"
+                    borderRadius="4px"
+                    padding="12px"
+                    cursor="pointer"
+                    onClick={() => selectFunction(fn.id)}
+                    _hover={{ borderColor: '#007bff' }}
+                  >
+                    <VStack gap="8px" align="stretch">
+                      {/* Название функции */}
+                      {editingName === fn.id ? (
+                        <HStack gap="4px">
+                          <Input
+                            value={tempName}
+                            onChange={(e) => setTempName(e.target.value)}
+                            size="sm"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                if (tempName.trim()) {
+                                  updateFunction(fn.id, { name: tempName.trim() });
+                                }
+                                setEditingName(null);
+                                setTempName('');
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingName(null);
+                                setTempName('');
+                              }
+                            }}
+                          />
+                          <Button
+                            size="xs"
+                            onClick={() => {
+                              if (tempName.trim()) {
+                                updateFunction(fn.id, { name: tempName.trim() });
+                              }
+                              setEditingName(null);
+                              setTempName('');
+                            }}
+                          >
+                            ✓
+                          </Button>
+                          <Button
+                            size="xs"
+                            onClick={() => {
+                              setEditingName(null);
+                              setTempName('');
+                            }}
+                          >
+                            ✕
+                          </Button>
+                        </HStack>
+                      ) : (
+                        <HStack justify="space-between">
+                          <Text
+                            fontSize="14px"
+                            fontWeight="bold"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingName(fn.id);
+                              setTempName(fn.name);
+                            }}
+                            flex="1"
+                            _hover={{ color: '#007bff' }}
+                          >
+                            {fn.name}
+                          </Text>
+                          <HStack gap="4px">
+                            <input
+                              type="checkbox"
+                              checked={fn.enabled}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                updateFunction(fn.id, { enabled: e.target.checked });
+                              }}
+                            />
+                          </HStack>
+                        </HStack>
+                      )}
+
+                      {/* Триггер */}
+                      <select
+                        style={{
+                          padding: '6px',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          backgroundColor: 'white',
+                          width: '100%',
+                        }}
+                        value={fn.trigger}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                          updateFunction(fn.id, { trigger: e.target.value as TriggerType });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {Object.entries(triggerLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Привязка к блоку */}
+                      <select
+                        style={{
+                          padding: '6px',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          backgroundColor: 'white',
+                          width: '100%',
+                        }}
+                        value={fn.blockId || ''}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                          updateFunction(fn.id, { blockId: e.target.value || null });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="">Глобальная функция</option>
+                        {(() => {
+                          const blocks: Array<{ id: string; label: string }> = [];
+                          const traverse = (block: any, prefix = '') => {
+                            const label =
+                              prefix +
+                              (block.type === 'text'
+                                ? '📝 Текст'
+                                : block.type === 'image'
+                                  ? '🖼️ Изображение'
+                                  : block.type === 'button'
+                                    ? '🔘 Кнопка'
+                                    : block.type === 'video'
+                                      ? '🎥 Видео'
+                                      : block.type === 'container'
+                                        ? '📦 Контейнер'
+                                        : block.type === 'grid'
+                                          ? '🔳 Сетка'
+                                          : 'Блок');
+                            blocks.push({ id: block.id, label });
+                            if (block.type === 'container' && block.children) {
+                              block.children.forEach((child: any) => traverse(child, prefix + '  '));
+                            }
+                            if (block.type === 'grid' && block.cells) {
+                              block.cells.forEach((cell: any, index: number) => {
+                                if (cell.block) {
+                                  traverse(cell.block, prefix + `  [${index + 1}] `);
+                                }
+                              });
+                            }
+                          };
+                          project.blocks.forEach((block) => traverse(block));
+                          return blocks;
+                        })().map((block) => (
+                          <option key={block.id} value={block.id}>
+                            {block.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Информация */}
+                      <Text fontSize="12px" color="#666">
+                        Действий: {fn.actions.length} | Условий: {fn.conditions.length}
+                      </Text>
+
+                      {/* Кнопки управления */}
+                      <HStack gap="4px" justify="flex-end">
+                        <Button
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            duplicateFunction(fn.id);
+                          }}
+                        >
+                          📋
+                        </Button>
+                        <Button
+                          size="xs"
+                          colorScheme="red"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm('Вы уверены, что хотите удалить эту функцию?')) {
+                              deleteFunction(fn.id);
+                            }
+                          }}
+                        >
+                          🗑️
+                        </Button>
+                      </HStack>
+                    </VStack>
+                  </Box>
+                ))}
+              </VStack>
+            )}
+          </VStack>
+        )}
+      </Box>
+
+      {isOpen && (
+        <Box
+          position="fixed"
+          top="0"
+          left="0"
+          width="100vw"
+          height="100vh"
+          backgroundColor="rgba(0, 0, 0, 0.5)"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          zIndex={1000}
+        >
+          <Box backgroundColor="white" width="90%" maxWidth="520px" borderRadius="8px" boxShadow="md">
+            <HStack padding="16px" borderBottom="1px solid #eee" justify="space-between">
+              <Text fontWeight="bold">Сохранить как готовый блок</Text>
+              <Button variant="ghost" size="sm" onClick={onClose}>×</Button>
+            </HStack>
+            <Box padding="16px">
+              <VStack gap="16px" align="stretch">
+                <Box>
+                  <Text fontSize="14px" marginBottom="8px">
+                    Название *
+                  </Text>
+                  <Input
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="Например: Hero секция"
+                  />
+                </Box>
+                <Box>
+                  <Text fontSize="14px" marginBottom="8px">
+                    Описание
+                  </Text>
+                  <Input
+                    value={templateDescription}
+                    onChange={(e) => setTemplateDescription(e.target.value)}
+                    placeholder="Краткое описание блока"
+                  />
+                </Box>
+                <Box>
+                  <Text fontSize="14px" marginBottom="8px">
+                    Выберите блоки для сохранения:
+                  </Text>
+                  <VStack gap="8px" align="stretch" maxHeight="200px" overflowY="auto">
+                    {project.blocks.map((block) => (
+                      <HStack key={block.id} gap="8px">
+                        <input
+                          type="checkbox"
+                          checked={selectedBlocks.includes(block.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBlocks([...selectedBlocks, block.id]);
+                            } else {
+                              setSelectedBlocks(selectedBlocks.filter((id) => id !== block.id));
+                            }
+                          }}
+                        />
+                        <Text fontSize="12px">
+                          {block.type === 'text' && '📝 Текст'}
+                          {block.type === 'image' && '🖼️ Изображение'}
+                          {block.type === 'button' && '🔘 Кнопка'}
+                          {block.type === 'video' && '🎥 Видео'}
+                          {' - '}
+                          {block.type === 'text' && (block as any).content?.substring(0, 30)}
+                          {block.type === 'button' && (block as any).text}
+                          {block.type === 'image' && 'Изображение'}
+                          {block.type === 'video' && 'Видео'}
+                        </Text>
+                      </HStack>
+                    ))}
+                  </VStack>
+                  {project.blocks.length === 0 && (
+                    <Text fontSize="12px" color="#999">
+                      Нет блоков на странице
+                    </Text>
+                  )}
+                </Box>
+              </VStack>
+            </Box>
+            <HStack padding="16px" borderTop="1px solid #eee" justify="flex-end">
+              <Button variant="ghost" onClick={onClose} marginRight="8px">
+                Отмена
+              </Button>
+              <Button onClick={handleSaveAsTemplate} backgroundColor="#007bff" color="white">
+                Сохранить
+              </Button>
+            </HStack>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+};
+

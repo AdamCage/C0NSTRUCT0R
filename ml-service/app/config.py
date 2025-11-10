@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from typing import List
 import os
 
@@ -17,5 +18,12 @@ class Settings(BaseSettings):
     ollama_timeout: int = 120
 
     model_config = SettingsConfigDict(env_prefix="", env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+
+    @field_validator("cors_origins", mode="before")
+    def _parse_cors_origins(cls, v):
+        # Allow comma-separated env values in addition to JSON array
+        if isinstance(v, str):
+            return [s.strip() for s in v.split(",") if s.strip()]
+        return v
 
 settings = Settings()

@@ -48,6 +48,22 @@ class OllamaClient:
             r = await client.post(url, json=payload)
             r.raise_for_status()
             data = r.json()
+
+        # Basic error field from Ollama
+        if isinstance(data, dict) and data.get("error"):
+            raise RuntimeError(f"Ollama error: {data.get('error')}")
+
         # Ollama returns {"response": "...json string...", "done": true, ...}
-        raw = data.get("response", "")
+        raw = data.get("response", None)
+        if raw is None:
+            raise RuntimeError(f"Ollama response has no 'response' field: {data}")
+
+        # If response is already a dict/list (when format=json may return structured data)
+        if isinstance(raw, (dict, list)):
+            return raw  # assume it's valid JSON already
+
+        if not isinstance(raw, str):
+            raise RuntimeError(f"Unexpected Ollama response type: {type(raw)}")
+
+        # Parse string into JSON
         return coerce_json(raw)
