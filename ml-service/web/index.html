@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ML Site Generator Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    .row { display: flex; gap: 12px; align-items: center; }
+    textarea { width: 100%; height: 80px; }
+    pre { background: #111; color: #eee; padding: 12px; overflow:auto; }
+    #layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; }
+    .hero { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>Генерация шаблона сайта</h1>
+  <div class="row">
+    <input id="query" placeholder="сайт пиво" value="сайт пиво" style="flex:1"/>
+    <select id="theme">
+      <option value="light">light</option>
+      <option value="dark">dark</option>
+    </select>
+    <button id="btn">Сгенерировать</button>
+  </div>
+  <p>API: <code id="api"></code></p>
+  <h2>Результат</h2>
+  <div id="layout"></div>
+  <h3>JSON</h3>
+  <pre id="json"></pre>
+<script>
+const API = (window.API_URL || "/api"); // nginx will proxy /api → ml-service
+document.getElementById("api").textContent = API;
+const btn = document.getElementById("btn");
+const queryEl = document.getElementById("query");
+const themeEl = document.getElementById("theme");
+const layoutEl = document.getElementById("layout");
+const jsonEl = document.getElementById("json");
+
+btn.onclick = async () => {
+  layoutEl.innerHTML = "";
+  jsonEl.textContent = "Загрузка...";
+  const res = await fetch(API + "/api/v1/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: queryEl.value, language: "ru", theme: themeEl.value })
+  });
+  const data = await res.json();
+  jsonEl.textContent = JSON.stringify(data, null, 2);
+  const tpl = data.template;
+  if (!tpl || !tpl.layout) return;
+  for (const sec of tpl.layout) {
+    const card = document.createElement("div");
+    card.className = "card " + (sec.type || "");
+    const h = document.createElement("h4");
+    h.textContent = sec.title || sec.type;
+    card.appendChild(h);
+    if (sec.subtitle) {
+      const p = document.createElement("p");
+      p.textContent = sec.subtitle;
+      card.appendChild(p);
+    }
+    for (const b of sec.blocks || []) {
+      if (b.type === "text") {
+        const p = document.createElement("p");
+        p.textContent = b.text;
+        card.appendChild(p);
+      } else if (b.type === "button") {
+        const a = document.createElement("a");
+        a.href = b.href || "#";
+        a.textContent = b.text || "Кнопка";
+        a.style.display = "inline-block";
+        a.style.padding = "6px 10px";
+        a.style.border = "1px solid #333";
+        a.style.borderRadius = "6px";
+        card.appendChild(a);
+      } else if (b.type === "image") {
+        const img = document.createElement("img");
+        img.src = b.url;
+        img.alt = b.alt || "";
+        img.style.maxWidth = "100%";
+        card.appendChild(img);
+      }
+    }
+    layoutEl.appendChild(card);
+  }
+};
+</script>
+</body>
+</html>
