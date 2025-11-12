@@ -1,4 +1,16 @@
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
-websockets==13.1
+sqlalchemy==2.0.36
+pydantic==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+python-multipart==0.0.12
+alembic==1.13.2
+# Для разработки на SQLite драйвер PostgreSQL не требуется.
+# Если используете PostgreSQL локально, установите один из вариантов вручную:
+# - psycopg[binary]==3.*  (рекомендуется для SQLAlchemy: URL вида postgresql+psycopg://)
+# - psycopg2-binary==2.*  (потребуется системный pg_config)
+# Для SQLite (для разработки)
+# sqlite3 встроен в Python
+
 
